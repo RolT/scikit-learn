@@ -270,6 +270,7 @@ Samples generator
    :template: class.rst
 
    decomposition.PCA
+   decomposition.IncrementalPCA
    decomposition.ProjectedGradientNMF
    decomposition.RandomizedPCA
    decomposition.KernelPCA
@@ -639,6 +640,7 @@ From text
    linear_model.LassoLarsIC
    linear_model.LinearRegression
    linear_model.LogisticRegression
+   linear_model.LogisticRegressionCV
    linear_model.MultiTaskLasso
    linear_model.MultiTaskElasticNet
    linear_model.MultiTaskLassoCV
@@ -770,6 +772,18 @@ details.
    metrics.mean_squared_error
    metrics.r2_score
 
+Multilabel ranking metrics
+--------------------------
+See the :ref:`multilabel_ranking_metrics` section of the user guide for further
+details.
+
+.. autosummary::
+   :toctree: generated/
+   :template: function.rst
+
+   metrics.label_ranking_average_precision_score
+
+
 
 Clustering metrics
 ------------------
@@ -884,17 +898,6 @@ Pairwise metrics
     multiclass.OneVsRestClassifier
     multiclass.OneVsOneClassifier
     multiclass.OutputCodeClassifier
-
-.. autosummary::
-    :toctree: generated
-    :template: function.rst
-
-    multiclass.fit_ovr
-    multiclass.predict_ovr
-    multiclass.fit_ovo
-    multiclass.predict_ovo
-    multiclass.fit_ecoc
-    multiclass.predict_ecoc
 
 .. _naive_bayes_ref:
 

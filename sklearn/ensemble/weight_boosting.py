@@ -5,7 +5,7 @@ regression.
 
 The module structure is the following:
 
-- The ``BaseAdaBoost`` base class implements a common ``fit`` method
+- The ``BaseWeightBoosting`` base class implements a common ``fit`` method
   for all the estimators in the module. Regression and classification
   only differ from each other in the loss function that is optimized.
 
@@ -26,9 +26,6 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 from numpy.core.umath_tests import inner1d
 
-from scipy.sparse import coo_matrix
-from scipy.sparse import issparse
-
 from .base import BaseEnsemble
 from ..base import ClassifierMixin, RegressorMixin
 from ..externals import six
@@ -37,9 +34,9 @@ from .forest import BaseForest
 from ..tree import DecisionTreeClassifier, DecisionTreeRegressor
 from ..tree.tree import BaseDecisionTree
 from ..tree._tree import DTYPE
-from ..utils import array2d, check_arrays, check_random_state, column_or_1d
-from ..utils import safe_asarray
+from ..utils import check_array, check_X_y, check_random_state
 from ..metrics import accuracy_score, r2_score
+from sklearn.utils.validation import has_fit_parameter
 
 __all__ = [
     'AdaBoostClassifier',
@@ -98,20 +95,13 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         if self.learning_rate <= 0:
             raise ValueError("learning_rate must be greater than zero")
 
-        # Check data
-        if isinstance(X, coo_matrix):
-            X = X.tocsr()
-        X = safe_asarray(X)
-
-        if (X.ndim != 2 and not issparse(X)):
-            X = array2d(X)
-
         if(self.base_estimator is None or
            isinstance(self.base_estimator, (BaseDecisionTree, BaseForest))):
-            X, = check_arrays(X, dtype=DTYPE)
-        X, y = check_arrays(X, y, check_ccontiguous=True)
+            dtype = DTYPE
+        else:
+            dtype = None
 
-        y = column_or_1d(y, warn=True)
+        X, y = check_X_y(X, y, ['csr', 'csc'], dtype=dtype, order='C')
 
         if sample_weight is None:
             # Initialize weights to 1 / n_samples
@@ -260,6 +250,11 @@ class BaseWeightBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
                 "since base_estimator does not have a "
                 "feature_importances_ attribute")
 
+    def _check_sample_weight(self):
+        if not has_fit_parameter(self.base_estimator_, "sample_weight"):
+            raise ValueError("%s doesn't support sample_weight."
+                             % self.base_estimator_.__class__.__name__)
+
 
 def _samme_proba(estimator, n_classes, X):
     """Calculate algorithm 4, step 2, equation c) of Zhu et al [1].
@@ -323,23 +318,23 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
 
     Attributes
     ----------
-    `estimators_` : list of classifiers
+    estimators_ : list of classifiers
         The collection of fitted sub-estimators.
 
-    `classes_` : array of shape = [n_classes]
+    classes_ : array of shape = [n_classes]
         The classes labels.
 
-    `n_classes_` : int
+    n_classes_ : int
         The number of classes.
 
-    `estimator_weights_` : array of floats
+    estimator_weights_ : array of floats
         Weights for each estimator in the boosted ensemble.
 
-    `estimator_errors_` : array of floats
+    estimator_errors_ : array of floats
         Classification error for each estimator in the boosted
         ensemble.
 
-    `feature_importances_` : array of shape = [n_features]
+    feature_importances_ : array of shape = [n_features]
         The feature importances if supported by the ``base_estimator``.
 
     See also
@@ -412,6 +407,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
                     "probabilities with a predict_proba method.\n"
                     "Please change the base estimator or set "
                     "algorithm='SAMME' instead.")
+        self._check_sample_weight()
 
     def _boost(self, iboost, X, y, sample_weight):
         """Implement a single boost.
@@ -642,7 +638,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             class in ``classes_``, respectively.
         """
         self._check_fitted()
-        X = safe_asarray(X)
+        X = check_array(X, accept_sparse=['csr', 'csc', 'coo'])
 
         n_classes = self.n_classes_
         classes = self.classes_[:, np.newaxis]
@@ -686,7 +682,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             class in ``classes_``, respectively.
         """
         self._check_fitted()
-        X = safe_asarray(X)
+        X = check_array(X, accept_sparse=['csr', 'csc', 'coo'])
 
         n_classes = self.n_classes_
         classes = self.classes_[:, np.newaxis]
@@ -736,7 +732,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             outputs is the same of that of the `classes_` attribute.
         """
         n_classes = self.n_classes_
-        X = safe_asarray(X)
+        X = check_array(X, accept_sparse=['csr', 'csc', 'coo'])
 
         if self.algorithm == 'SAMME.R':
             # The weights are all 1. for SAMME.R
@@ -865,16 +861,16 @@ class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
 
     Attributes
     ----------
-    `estimators_` : list of classifiers
+    estimators_ : list of classifiers
         The collection of fitted sub-estimators.
 
-    `estimator_weights_` : array of floats
+    estimator_weights_ : array of floats
         Weights for each estimator in the boosted ensemble.
 
-    `estimator_errors_` : array of floats
+    estimator_errors_ : array of floats
         Regression error for each estimator in the boosted ensemble.
 
-    `feature_importances_` : array of shape = [n_features]
+    feature_importances_ : array of shape = [n_features]
         The feature importances if supported by the ``base_estimator``.
 
     See also
@@ -938,6 +934,7 @@ class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
         """Check the estimator and set the base_estimator_ attribute."""
         super(AdaBoostRegressor, self)._validate_estimator(
             default=DecisionTreeRegressor(max_depth=3))
+        self._check_sample_weight()
 
     def _boost(self, iboost, X, y, sample_weight):
         """Implement a single boost for regression
@@ -1070,7 +1067,7 @@ class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
             The predicted regression values.
         """
         self._check_fitted()
-        X = safe_asarray(X)
+        X = check_array(X, accept_sparse=['csr', 'csc', 'coo'])
 
         return self._get_median_predict(X, len(self.estimators_))
 
@@ -1096,7 +1093,7 @@ class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
             The predicted regression values.
         """
         self._check_fitted()
-        X = safe_asarray(X)
+        X = check_array(X, accept_sparse=['csr', 'csc', 'coo'])
 
         for i, _ in enumerate(self.estimators_, 1):
             yield self._get_median_predict(X, limit=i)

@@ -77,6 +77,25 @@ def test_label_binarizer():
     assert_array_equal(lb.inverse_transform(got), inp)
 
 
+def test_label_binarizer_unseen_labels():
+    lb = LabelBinarizer()
+
+    expected = np.array([[1, 0, 0],
+                         [0, 1, 0],
+                         [0, 0, 1]])
+    got = lb.fit_transform(['b', 'd', 'e'])
+    assert_array_equal(expected, got)
+
+    expected = np.array([[0, 0, 0],
+                         [1, 0, 0],
+                         [0, 0, 0],
+                         [0, 1, 0],
+                         [0, 0, 1],
+                         [0, 0, 0]])
+    got = lb.transform(['a', 'b', 'c', 'd', 'e', 'f'])
+    assert_array_equal(expected, got)
+
+
 @ignore_warnings
 def test_label_binarizer_column_y():
     # first for binary classification vs multi-label with 1 possible class
@@ -191,6 +210,11 @@ def test_label_binarizer_errors():
     assert_raises(ValueError, _inverse_binarize_thresholding,
                   y=np.array([[1, 2, 3], [2, 1, 3]]), output_type="binary",
                   classes=[1, 2, 3], threshold=0)
+
+    # Fail on multioutput data
+    assert_raises(ValueError, LabelBinarizer().fit, np.array([[1, 3], [2, 1]]))
+    assert_raises(ValueError, label_binarize, np.array([[1, 3], [2, 1]]),
+                  [1, 2, 3])
 
 
 def test_label_encoder():
@@ -465,6 +489,15 @@ def test_label_binarize_binary():
 
     yield check_binarized_results, y, classes, pos_label, neg_label, expected
 
+    # Binary case where sparse_output = True will not result in a ValueError
+    y = [0, 1, 0]
+    classes = [0, 1]
+    pos_label = 3
+    neg_label = 0
+    expected = np.array([[3, 0], [0, 3], [3, 0]])[:, 1].reshape((-1, 1))
+
+    yield check_binarized_results, y, classes, pos_label, neg_label, expected
+
 
 def test_label_binarize_multiclass():
     y = [0, 1, 2]
@@ -523,10 +556,8 @@ def test_deprecation_inverse_binarize_thresholding():
 
 
 def test_invalid_input_label_binarize():
-    assert_raises(ValueError, label_binarize, [0.5, 2], classes=[1, 2])
     assert_raises(ValueError, label_binarize, [0, 2], classes=[0, 2],
                   pos_label=0, neg_label=1)
-    assert_raises(ValueError, label_binarize, [1, 2], classes=[0, 2])
 
 
 def test_inverse_binarize_multiclass():
